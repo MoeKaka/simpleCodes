@@ -1,0 +1,162 @@
+package com.example;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class DesJpaDao implements DesDao {
+
+
+
+    @Override
+    public QueriesResults executeQueries(int repId) {
+        String sqlB = "SELECT new com.example.QueriesResults$ReportData(b.QUELLE, mnu.NAME, b.rep_r, r.DELETED, r.Rep_per_START, r.Rep_per_END, r.Rep_per, r.des_ex_ts) " +
+                "FROM rep r " +
+                "JOIN C_M_I mnu ON mnu.ID = r.REF_M_I " +
+                "JOIN body b ON b.REF_C_R = r.id " +
+                "WHERE r.id = :id";
+
+        List<QueriesResults.ReportData> queriesResultsReportData = entityManager.createQuery(sqlB, QueriesResults.ReportData.class)
+                .setParameter("id", 816).getResultList();
+
+        String sqlA = "SELECT new com.example.QueriesResults$XmlFragmentData(l.country, l.MESSAGE_REF_ID, TO_CHAR(l.Rep_per, 'YYYY-MM-DD HH24:MI:SS.FF3') as Rep_per, convert_blob_to_xmltype(h.xml_fragment).getClobVal() as XML_FRAGMENT) " +
+                "FROM rep r " +
+                "JOIN body b ON b.REF_C_R = r.id " +
+                "JOIN lief l ON l.id = b.REF_D_L_ID " +
+                "JOIN hist h ON h.REF_D_L = l.id  " +
+                "AND h.REF_BODY = b.id " +
+                "WHERE r.id = :repId " +
+                "AND l.STATUS = 'ACCEPTED' " +
+                "AND h.STATUS = 'FFFF' " +
+                "AND h.F_C_R = 1 " +
+                "AND h.D_T_I <> 'OECD_3'  " +
+
+                "union all " +
+
+                "SELECT l.country, l.MESSAGE_REF_ID, TO_CHAR(l.Rep_per, 'YYYY-MM-DD HH24:MI:SS.FF3') as Rep_per, convert_blob_to_xmltype(h.xml_fragment).getClobVal() as XML_FRAGMENT " +
+                "FROM rep r " +
+                "JOIN body b ON b.REF_C_R = r.id " +
+                "JOIN D_lief l ON l.id = b.REF_DE_lief_ID " +
+                "JOIN D_lief_HISTORIE h ON h.REF_DE_lief = l.id  " +
+                "AND h.REF_DE_lief = l.id " +
+                "WHERE r.id = repId1 " +
+                "AND l.Lief_St = 'ACCEPTED' " +
+                "AND h.STATUS IN ('FFFF', 'EINGESCHRAENKT_FFFF') " +
+                "AND h.F_C_R = 1 " +
+                "AND h.D_T_I <> 'OECD_3' ";
+
+        List<QueriesResults.XmlFragmentData> queriesResultXmlFragments = entityManager.createQuery(sqlA, QueriesResults.XmlFragmentData.class)
+                .setParameter("repId", 816)
+                .setParameter("repId1", 816)
+                .getResultList();
+
+        return new QueriesResults(queriesResultXmlFragments, queriesResultsReportData);
+    }
+}
+
+
+
+
+
+
+
+
+
+
+package com.example;
+
+public interface DesDao {
+    QueriesResults executeQueries(int repId);
+}
+
+
+
+
+
+
+package com.example;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
+
+// to store the results from the SQL Queries for the service.
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class QueriesResults {
+
+    private List<XmlFragmentData> fragments;
+    private List<ReportData> reportData;
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class ReportData {
+        private boolean isRepExist = false;
+        private String quelle;
+        private String mName = null;
+        private String repR = null;
+        private int isBodyDeleted = 0;
+        private Timestamp repPerStart = null;
+        private Timestamp repPerEnd = null;
+        private Timestamp repPer = null;
+        private Timestamp desExTs = null;
+
+        public ReportData(String quelle, String mName, String repR, int isBodyDeleted, Timestamp repPerStart, Timestamp repPerEnd, Timestamp repPer, Timestamp desExTs) {
+            this.quelle = quelle;
+            this.mName = mName;
+            this.repR = repR;
+            this.isBodyDeleted = isBodyDeleted;
+            this.repPerStart = repPerStart;
+            this.repPerEnd = repPerEnd;
+            this.repPer = repPer;
+            this.desExTs = desExTs;
+        }
+    }
+
+
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class XmlFragmentData {
+        private String mRefId;
+        private String repPer;
+        private String xmlFragment;
+        private String country;
+    }
+
+}
+
+
+
+
+
+
+
+package com.example;
+
+public class DesService {
+    private final DesDao myDao;
+
+    public DesService() {
+        this.myDao = new DesJpaDao();
+    }
+
+    public QueriesResults getData(int repId) {
+        return myDao.executeQueries(repId);
+    }
+
+    public static void main(String[] args) {
+        DesService myService = new DesService();
+        QueriesResults results = myService.getData(816);
+    }
+}
