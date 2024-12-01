@@ -1,0 +1,162 @@
+package com.example.entity;
+
+import javax.persistence.*;
+import java.sql.Timestamp;
+
+@Entity
+@Table(name = "rep")
+public class Report {
+    @Id
+    @Column(name = "id")
+    private Long id;
+    
+    @Column(name = "DELETED")
+    private Integer deleted;
+    
+    @Column(name = "Rep_per_START")
+    private Timestamp repPerStart;
+    
+    @Column(name = "Rep_per_END")
+    private Timestamp repPerEnd;
+    
+    @Column(name = "Rep_per")
+    private Timestamp repPer;
+    
+    @Column(name = "des_ex_ts")
+    private Timestamp desExTs;
+    
+    @Column(name = "REF_M_I")
+    private Long refMI;
+
+    // Getters and setters
+}
+
+@Entity
+@Table(name = "C_M_I")
+public class MenuItem {
+    @Id
+    @Column(name = "ID")
+    private Long id;
+    
+    @Column(name = "NAME")
+    private String name;
+
+    // Getters and setters
+}
+
+@Entity
+@Table(name = "body")
+public class Body {
+    @Id
+    private Long id;
+    
+    @Column(name = "QUELLE")
+    private String quelle;
+    
+    @Column(name = "rep_r")
+    private String repR;
+    
+    @Column(name = "REF_C_R")
+    private Long refCR;
+    
+    @Column(name = "REF_D_L_ID")
+    private Long refDLId;
+    
+    @Column(name = "REF_DE_lief_ID")
+    private Long refDeLiefId;
+
+    // Getters and setters
+}
+
+@Entity
+@Table(name = "lief")
+public class Lief {
+    @Id
+    private Long id;
+    
+    @Column(name = "country")
+    private String country;
+    
+    @Column(name = "MESSAGE_REF_ID")
+    private String messageRefId;
+    
+    @Column(name = "Rep_per")
+    private Timestamp repPer;
+    
+    @Column(name = "STATUS")
+    private String status;
+
+    // Getters and setters
+}
+
+@Entity
+@Table(name = "hist")
+public class History {
+    @Id
+    private Long id;
+    
+    @Column(name = "REF_D_L")
+    private Long refDL;
+    
+    @Column(name = "REF_BODY")
+    private Long refBody;
+    
+    @Column(name = "STATUS")
+    private String status;
+    
+    @Column(name = "F_C_R")
+    private Integer fCR;
+    
+    @Column(name = "D_T_I")
+    private String dTI;
+    
+    @Column(name = "xml_fragment")
+    private byte[] xmlFragment;
+
+    // Getters and setters
+}
+
+@Entity
+@Table(name = "D_lief")
+public class DLief {
+    @Id
+    private Long id;
+    
+    @Column(name = "country")
+    private String country;
+    
+    @Column(name = "MESSAGE_REF_ID")
+    private String messageRefId;
+    
+    @Column(name = "Rep_per")
+    private Timestamp repPer;
+    
+    @Column(name = "Lief_St")
+    private String liefSt;
+
+    // Getters and setters
+}
+
+@Entity
+@Table(name = "D_lief_HISTORIE")
+public class DLiefHistory {
+    @Id
+    private Long id;
+    
+    @Column(name = "REF_DE_lief")
+    private Long refDeLief;
+    
+    @Column(name = "STATUS")
+    private String status;
+    
+    @Column(name = "F_C_R")
+    private Integer fCR;
+    
+    @Column(name = "D_T_I")
+    private String dTI;
+    
+    @Column(name = "xml_fragment")
+    private byte[] xmlFragment;
+
+    // Getters and setters
+}
