@@ -1,0 +1,179 @@
+package com.example;
+
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.runners.MockitoJUnitRunner;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
+
+@RunWith(MockitoJUnitRunner.class)
+public class MyServiceTest {
+
+    @Mock
+    private QueryDao queryDao;
+
+    private MyService myService;
+
+    @Before
+    public void setUp() {
+        myService = new MyService(queryDao);
+    }
+
+    @Test
+    public void getRep_whenNoReportData_returnsNoReportFound() {
+        // Arrange
+        QueriesResults queriesResults = new QueriesResults();
+        queriesResults.setRepData(new ArrayList<>());
+        queriesResults.setFragments(new ArrayList<>());
+        
+        when(queryDao.executeQueries(anyInt())).thenReturn(queriesResults);
+
+        // Act
+        MyService.Result result = myService.getRep(1);
+
+        // Assert
+        assertEquals(MyService.ResultCode.NO_REPORT_FOUND, result.getCode());
+        assertNull(result.getFileName());
+        assertNull(result.getXmlFileContent());
+    }
+
+    @Test
+    public void getRep_whenNoFragmentsAndNoDesExTs_returnsNothingToSend() {
+        // Arrange
+        QueriesResults queriesResults = new QueriesResults();
+        List<QueriesResults.RepData> repDataList = new ArrayList<>();
+        QueriesResults.RepData repData = new QueriesResults.RepData();
+        repDataList.add(repData);
+        queriesResults.setRepData(repDataList);
+        queriesResults.setFragments(new ArrayList<>());
+
+        when(queryDao.executeQueries(anyInt())).thenReturn(queriesResults);
+
+        // Act
+        MyService.Result result = myService.getRep(1);
+
+        // Assert
+        assertEquals(MyService.ResultCode.NOTHING_TO_SEND, result.getCode());
+        assertNull(result.getFileName());
+        assertNull(result.getXmlFileContent());
+    }
+
+    @Test
+    public void getRep_whenNoFragmentsButHasDesExTs_returnsOnlyFileName() {
+        // Arrange
+        QueriesResults queriesResults = new QueriesResults();
+        List<QueriesResults.RepData> repDataList = new ArrayList<>();
+        QueriesResults.RepData repData = new QueriesResults.RepData();
+        repData.setDesExTs(new Date());
+        repData.setMName("TEST");
+        repData.setRepR("CMC_123");
+        repData.setQuelle("TEST");
+        repData.setRepPer(new Date());
+        repData.setRepPerS(new Date());
+        repData.setRepPerE(new Date());
+        repDataList.add(repData);
+        queriesResults.setRepData(repDataList);
+        queriesResults.setFragments(new ArrayList<>());
+
+        when(queryDao.executeQueries(anyInt())).thenReturn(queriesResults);
+
+        // Act
+        MyService.Result result = myService.getRep(1);
+
+        // Assert
+        assertEquals(MyService.ResultCode.ONLY_FILE_NAME, result.getCode());
+        assertNotNull(result.getFileName());
+        assertNull(result.getXmlFileContent());
+    }
+
+    @Test
+    public void getRep_whenHasValidFragments_returnsFileNameAndContent() {
+        // Arrange
+        QueriesResults queriesResults = new QueriesResults();
+        
+        // Set up RepData
+        List<QueriesResults.RepData> repDataList = new ArrayList<>();
+        QueriesResults.RepData repData = new QueriesResults.RepData();
+        repData.setMName("TEST");
+        repData.setRepR("CMC_123");
+        repData.setQuelle("TEST");
+        repData.setRepPer(new Date());
+        repData.setRepPerS(new Date());
+        repData.setRepPerE(new Date());
+        repDataList.add(repData);
+        queriesResults.setRepData(repDataList);
+        
+        // Set up Fragments
+        List<QueriesResults.XmlFragmentData> fragments = new ArrayList<>();
+        QueriesResults.XmlFragmentData fragment = new QueriesResults.XmlFragmentData();
+        fragment.setCountry("DE");
+        fragment.setXmlFragment("<Rep><data>Test</data></Rep>");
+        fragments.add(fragment);
+        queriesResults.setFragments(fragments);
+
+        when(queryDao.executeQueries(anyInt())).thenReturn(queriesResults);
+
+        // Act
+        MyService.Result result = myService.getRep(1);
+
+        // Assert
+        assertEquals(MyService.ResultCode.FILE_NAME_AND_CONTENT, result.getCode());
+        assertNotNull(result.getFileName());
+        assertNotNull(result.getXmlFileContent());
+        assertTrue(result.getXmlFileContent().contains("CMC_KAKA"));
+    }
+
+    @Test
+    public void isRepPerShort_whenPeriodLessThanYear_returnsTrue() {
+        // Arrange
+        Date startDate = new Date();
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(startDate);
+        calendar.add(Calendar.MONTH, 6);
+        Date endDate = calendar.getTime();
+
+        // Act
+        boolean result = myService.isRepPerShort(startDate, endDate);
+
+        // Assert
+        assertTrue(result);
+    }
+
+    @Test
+    public void isRepPerShort_whenPeriodMoreThanYear_returnsFalse() {
+        // Arrange
+        Date startDate = new Date();
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(startDate);
+        calendar.add(Calendar.YEAR, 1);
+        calendar.add(Calendar.DAY_OF_YEAR, 1);
+        Date endDate = calendar.getTime();
+
+        // Act
+        boolean result = myService.isRepPerShort(startDate, endDate);
+
+        // Assert
+        assertFalse(result);
+    }
+
+    @Test
+    public void getRep_whenProcessingFails_returnsError() {
+        // Arrange
+        when(queryDao.executeQueries(anyInt())).thenThrow(new RuntimeException("Test exception"));
+
+        // Act
+        MyService.Result result = myService.getRep(1);
+
+        // Assert
+        assertEquals(MyService.ResultCode.ERROR_PROCESSING, result.getCode());
+        assertNull(result.getFileName());
+        assertNull(result.getXmlFileContent());
+    }
+}
