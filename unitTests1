@@ -1,3 +1,21 @@
+@Test
+    public void isRepPerShort_whenPeriodExactlyOneYear_returnsFalse() {
+        // Arrange
+        Calendar calendar = Calendar.getInstance();
+        calendar.set(2024, Calendar.JANUARY, 1); // Set to January 1, 2024
+        Date startDate = calendar.getTime();
+        
+        calendar.set(2024, Calendar.DECEMBER, 31); // Set to December 31, 2024
+        Date endDate = calendar.getTime();
+
+        // Act
+        boolean result = myService.isRepPerShort(startDate, endDate);
+
+        // Assert
+        assertFalse("Period of exactly one year should return false", result);
+    }
+
+
 package com.example;
 
 import org.junit.Before;
