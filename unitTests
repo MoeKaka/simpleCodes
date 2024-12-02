@@ -1,0 +1,538 @@
+QueriesResults.java
+
+package com.example;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.util.Date;
+import java.util.List;
+
+// to store the results from the SQL Queries for the service.
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class QueriesResults {
+
+    private List<XmlFragmentData> fragments;
+    private List<RepData> repData;
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class RepData {
+        private boolean isReportExist = false;
+        private String quelle;
+        private String mName = null;
+        private String repR = null;
+        private int isBodyDeleted = 0;
+        private Date repPerS = null;
+        private Date repPerE = null;
+        private Date repPer = null;
+        private Date desExTs = null;
+
+        public RepData(String quelle, String mName, String repR, int isBodyDeleted, Date repPerS, Date repPerE, Date repPer, Date desExTs) {
+            this.isReportExist = true;
+            this.quelle = quelle;
+            this.mName = mName;
+            this.repR = repR;
+            this.isBodyDeleted = isBodyDeleted;
+            this.repPerS = repPerS;
+            this.repPerE = repPerE;
+            this.repPer = repPer;
+            this.desExTs = desExTs;
+        }
+    }
+
+
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class XmlFragmentData {
+        private String country;
+        private String mRefId;
+        private String repPer;
+        private String xmlFragment;
+    }
+
+}
+
+
+
+
+MyService.java
+
+package com.example;
+
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Value;
+import lombok.extern.slf4j.Slf4j;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.sql.*;
+import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.Date;
+import java.util.*;
+
+
+public class MyService implements AutoCloseable {
+
+    private final QueryDao queryDao;
+
+    public MyService(QueryDao queryDao) {
+        this.queryDao = queryDao;
+    }
+
+    public MyService() {
+        this.queryDao = new QueryJpaDao();
+    }
+
+    @Override
+    public void close() {
+        if (queryDao instanceof QueryJpaDao) {
+            ((QueryJpaDao) queryDao).close();
+        }
+    }
+
+    public static void main(String[] args) {
+        MyService myService = new MyService();
+        //myService.getRowCounter();
+
+        MyService.Result result = myService.getRep(1325);
+        System.out.println("Code: " + result.getCode());
+        System.out.println("File name: " + result.getFileName());
+        if (result.getXmlFileContent() != null) {
+            System.out.println("XML Content: \n" + result.getXmlFileContent());
+        }
+    }
+
+
+    @Value
+    @Builder
+    public static class Result {
+        @lombok.NonNull
+        private MyService.ResultCode code;
+        private String fileName;
+        private String xmlFileContent;
+    }
+
+    @Getter
+    public enum ResultCode {
+        ERROR_PROCESSING(-1, "There was an processing error"),
+        NO_REPORT_FOUND(0, "No report found"),
+        NOTHING_TO_SEND(1, "Nothing to send"),
+        ONLY_FILE_NAME(2, "Empty file with .deleted"),
+        FILE_NAME_AND_CONTENT(3, "File with content must be sent");
+
+        private final int code;
+        private final String description;
+
+        ResultCode(int code, String description) {
+            this.code = code;
+            this.description = description;
+        }
+    }
+
+    // Helper class to store fragment data
+
+    // for the case 950
+    private static class CountryFragments {
+        String country;
+        List<String> fragments;
+
+        CountryFragments(String country) {
+            this.country = country;
+            this.fragments = new ArrayList<>();
+        }
+
+        void addFragment(String fragment) {
+            fragments.add(fragment);
+        }
+
+    }
+
+    public QueriesResults queryReportAndBodyInfo(int reportId) {
+        QueriesResults queriesResults = queryDao.executeQueries(reportId);
+        ;
+
+        return queriesResults;
+
+    }
+
+    public Result getRep(int reportId) {
+        QueriesResults queriesResults = queryReportAndBodyInfo(reportId);
+
+        if (queriesResults.getRepData().isEmpty())
+            return Result.builder().code(ResultCode.NO_REPORT_FOUND).build();
+
+        if (queriesResults.getFragments().isEmpty()) {
+            if (queriesResults.getRepData().get(0).getDesExTs() == null) {
+                return Result.builder().code(ResultCode.NOTHING_TO_SEND).build();
+            }
+
+            return Result.builder().code(ResultCode.ONLY_FILE_NAME)
+                    .fileName(buildFileName(queriesResults)).build();
+        }
+
+        try {
+            // Create message fragment
+            Element mSpecFragment = createMeSpFragment(queriesResults.getRepData().get(0).getRepPer());
+            if (mSpecFragment == null) {
+                throw new Exception("Failed to create MeSp fragment");
+            }
+
+            // Create bodies
+            List<Element> bodies = createBodies(queriesResults.getFragments());
+
+            // Create final XML file content
+            String xmlFileContent = createFinalXmlFileContent(bodies, mSpecFragment);
+            if (xmlFileContent == null) {
+                throw new Exception("Failed to create final XML");
+            }
+
+            return Result.builder().code(ResultCode.FILE_NAME_AND_CONTENT)
+                    .fileName(buildFileName(queriesResults)).xmlFileContent(xmlFileContent).build();
+
+        } catch (Exception e) {
+            System.err.println("Error processing report: " + e.getMessage());
+            return Result.builder().code(ResultCode.ERROR_PROCESSING).build();
+        }
+    }
+
+    private String buildFileName(QueriesResults queriesResults) {
+        String nameMNU = queriesResults.getRepData().get(0).getMnuName();
+        boolean is950 = ("CMC_950").equalsIgnoreCase(queriesResults.getRepData().get(0).getRepR()) ? true : false;
+        String quelle = queriesResults.getRepData().get(0).getQuelle();
+        boolean isDeleted = queriesResults.getRepData().get(0).getIsBodyDeleted() == 0 ? false : true;
+        String reportsYear = queriesResults.getRepData().get(0).getRepPer().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime().format(DateTimeFormatter.ofPattern("yyyy"));
+        String reportEndMonth = queriesResults.getRepData().get(0).getRepPer().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime().format(DateTimeFormatter.ofPattern("MM"));
+        boolean shortRepPer = isRepPerShort(queriesResults.getRepData().get(0).getRepPerS(), queriesResults.getRepData().get(0).getRepPerE());
+
+        String quellePart = is950 ? "950" : quelle;
+        String reportingMonthPart = (shortRepPer || is950) ? reportEndMonth : "";
+        String dashBeforeReportingMonth = "".equals(reportingMonthPart) ? "" : "-";
+        String fileExtensionPart = isDeleted ? ".geloescht" : ".xml";
+        String fileName = quellePart + "_" + nameMNU + "_" + reportsYear + dashBeforeReportingMonth + reportingMonthPart + fileExtensionPart;
+
+        return fileName;
+    }
+
+    public boolean isRepPerShort(Date repPerS, Date repPerE) {
+        // Convert to LocalDateTime for easier calculation
+        LocalDateTime date1 = repPerS.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+        LocalDateTime date2 = repPerE.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+
+        // Calculate days between, including end date
+        long daysBetween = ChronoUnit.DAYS.between(date1, date2) + 1;
+
+        // Check if range includes Feb 29 (leap year)
+        LocalDate startDate = date1.toLocalDate();
+        LocalDate endDate = date2.toLocalDate();
+
+        int daysInYear = 365;
+        if (isLeapYearInRange(startDate, endDate)) {
+            daysInYear = 366;
+        }
+
+        return daysBetween < daysInYear;
+    }
+
+    private boolean isLeapYearInRange(LocalDate startDate, LocalDate endDate) {
+        LocalDate date = startDate;
+        while (!date.isAfter(endDate)) {
+            if (date.isLeapYear()) {
+                LocalDate feb29 = LocalDate.of(date.getYear(), 2, 29);
+                if (!feb29.isBefore(startDate) && !feb29.isAfter(endDate)) {
+                    return true;
+                }
+            }
+            date = date.plusYears(1);
+        }
+        return false;
+    }
+
+    private String removeCorrElementAndSet_D_T_I(String xmlFragment) {
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document doc = builder.parse(new InputSource(new StringReader(xmlFragment)));
+
+            // Find all elements and check their local name for DocSp
+            NodeList allElements = doc.getElementsByTagName("*");
+            for (int i = 0; i < allElements.getLength(); i++) {
+                Element element = (Element) allElements.item(i);
+                if (element.getNodeName().endsWith("DocSp")) {
+                    // Found DocSp, now look for CorrId elements
+                    NodeList childNodes = element.getChildNodes();
+                    for (int j = childNodes.getLength() - 1; j >= 0; j--) {
+                        Node node = childNodes.item(j);
+                        if (node.getNodeType() == Node.ELEMENT_NODE) {
+                            if (node.getNodeName().endsWith("CorrId")) {
+                                element.removeChild(node);
+                                System.out.println("CorrId Removed.");
+                            } else if (node.getNodeName().endsWith("D_T_I")) {
+                                node.setTextContent("KAKA1");
+                                System.out.println("D_T_I changed to KAKA1.");
+                            }
+                        }
+                    }
+                }
+            }
+
+
+            // Convert modified document back to string
+            TransformerFactory transformerFactory = TransformerFactory.newInstance();
+            Transformer transformer = transformerFactory.newTransformer();
+            transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
+            StringWriter writer = new StringWriter();
+            transformer.transform(new DOMSource(doc), new StreamResult(writer));
+            return writer.toString();
+
+        } catch (Exception e) {
+            System.err.println("Error removing CorrId elements: " + e.getMessage());
+            e.printStackTrace();
+            return xmlFragment; // Return original content if processing fails
+        }
+    }
+
+
+    private String replaceCorrectable(String xmlFragment) throws Exception {
+        // Create DOM parser
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder builder = factory.newDocumentBuilder();
+
+        // Parse the XML string
+        Document doc = builder.parse(new InputSource(new StringReader(xmlFragment)));
+
+        // Get the root element
+        Element root = doc.getDocumentElement();
+
+        // Check root element name and replace if needed
+        String rootTagName = root.getTagName();
+        String newRootName = null;
+
+        // Get the root tag name and remove any prefix (anything before ":")
+        String tagNameWithoutPrefix = rootTagName.contains(":") ?
+                rootTagName.substring(rootTagName.indexOf(":") + 1) : rootTagName;
+
+        switch (tagNameWithoutPrefix) {
+            case "Correctable_R_E_T":
+                newRootName = "R_E";
+                break;
+            case "Correctable_R_T":
+                newRootName = "Rep";
+                break;
+            case "Correctable_Additional_I":
+                newRootName = "Additional_I";
+                break;
+        }
+
+        // If we need to replace the root
+        if (newRootName != null) {
+            // Create new root element
+            Element newRoot = doc.createElement(newRootName);
+
+            // Move all child nodes from old root to new root
+            while (root.hasChildNodes()) {
+                Node child = root.getFirstChild();
+                root.removeChild(child);
+                newRoot.appendChild(child);
+            }
+
+            // Replace old root with new root
+            doc.replaceChild(newRoot, root);
+        }
+
+        // Convert the modified DOM back to string
+        TransformerFactory transformerFactory = TransformerFactory.newInstance();
+        Transformer transformer = transformerFactory.newTransformer();
+        transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
+        StringWriter writer = new StringWriter();
+        transformer.transform(new DOMSource(doc), new StreamResult(writer));
+
+        return writer.toString();
+    }
+
+    private Element createMeSpFragment(Date reportPeriod) {
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document doc = builder.newDocument();
+
+            Element meSp = doc.createElement("MeSp");
+            doc.appendChild(meSp);
+
+            Element transmittingCountry = doc.createElement("TransmittingCountry");
+            transmittingCountry.setTextContent("DE");
+            meSp.appendChild(transmittingCountry);
+
+            Element receivingCountry = doc.createElement("ReceivingCountry");
+            receivingCountry.setTextContent("DE");
+            meSp.appendChild(receivingCountry);
+
+            Element messageType = doc.createElement("MessageType");
+            messageType.setTextContent("CMC");
+            meSp.appendChild(messageType);
+
+
+            String year = reportPeriod.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime().format(DateTimeFormatter.ofPattern("yyyy"));
+            String messageRefIdValue = "DE" + year + "-" + UUID.randomUUID();
+            Element messageRefId = doc.createElement("MessageRefId");
+            messageRefId.setTextContent(messageRefIdValue);
+            meSp.appendChild(messageRefId);
+
+            Element messageTypeIndic = doc.createElement("MessageTypeIndic");
+            messageTypeIndic.setTextContent("CMC401");
+            meSp.appendChild(messageTypeIndic);
+
+            Element reportingPeriod = doc.createElement("ReportingPeriod");
+            reportingPeriod.setTextContent(reportPeriod.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")));
+            meSp.appendChild(reportingPeriod);
+
+            Element timestamp = doc.createElement("Timestamp");
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
+            timestamp.setTextContent(sdf.format(new Date()));
+            meSp.appendChild(timestamp);
+
+            // TransformerFactory transformerFactory = TransformerFactory.newInstance();
+            // Transformer transformer = transformerFactory.newTransformer();
+            // transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
+            // StringWriter writer = new StringWriter();
+            // transformer.transform(new DOMSource(doc), new StreamResult(writer));
+            // return writer.toString();
+            return meSp;
+        } catch (Exception e) {
+            System.err.println("Error creating XML fragment: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private List<Element> createBodies(List<QueriesResults.XmlFragmentData> fragments) throws Exception {
+        // Create document for bodies creation
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder builder1 = factory.newDocumentBuilder();
+        Document doc = builder1.newDocument();
+
+        List<CountryFragments> countryFragments = new ArrayList<>();
+        List<Element> bodies = new ArrayList<>();
+
+        for (QueriesResults.XmlFragmentData fragment : fragments) {
+            CountryFragments existingCf = null;
+            for (CountryFragments cf : countryFragments) {
+                if (cf.country.equals(fragment.getCountry())) {
+                    existingCf = cf;
+                    break;
+                }
+            }
+
+            if (existingCf == null) {
+                existingCf = new CountryFragments(fragment.getCountry());
+                countryFragments.add(existingCf);
+            }
+
+            existingCf.addFragment(removeCorrElementAndSet_D_T_I(replaceCorrectable(fragment.getXmlFragment())));
+        }
+
+        for (CountryFragments cf : countryFragments) {
+            Element body = doc.createElement("Body");
+
+            // Sort fragments by root element type
+            Map<String, List<Element>> sortedFragments = new HashMap<>();
+            sortedFragments.put("R_I", new ArrayList<>());
+            sortedFragments.put("Rep", new ArrayList<>());
+            sortedFragments.put("Additional_I", new ArrayList<>());
+
+            DocumentBuilder builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            for (String fragmentXml : cf.fragments) {
+                Document fragmentDoc = builder.parse(new InputSource(new StringReader(fragmentXml)));
+                Element fragmentRoot = fragmentDoc.getDocumentElement();
+                String rootName = fragmentRoot.getNodeName();
+                if (rootName.contains(":")) {
+                    rootName = rootName.substring(rootName.indexOf(":") + 1);
+                }
+                if (sortedFragments.containsKey(rootName)) {
+                    sortedFragments.get(rootName).add((Element) doc.importNode(fragmentRoot, true));
+                }
+            }
+
+            // Add fragments in specified order: "R_I", "Rep", "Additional_I"
+            for (String rootType : Arrays.asList("R_I", "Rep", "Additional_I")) {
+                for (Element fragment : sortedFragments.get(rootType)) {
+                    body.appendChild(fragment);
+                }
+            }
+
+            bodies.add(body);
+        }
+        return bodies;
+    }
+
+    private String createFinalXmlFileContent(List<Element> bodies, Element messageFragment) {
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document doc = builder.newDocument();
+            doc.setXmlStandalone(true);
+            // Create CMC_KAKA element
+            Element rootElementXyz = doc.createElement("CMC_KAKA");
+            rootElementXyz.setAttribute("xmlns", "urn:kaka:ties:cmc:v2");
+            rootElementXyz.setAttribute("xmlns:ns2", "urn:kaka:ties:cmcstf:v5");
+            doc.appendChild(rootElementXyz);
+
+            // Parse and add Message fragment
+            Node messageNode = doc.importNode(messageFragment, true);
+            rootElementXyz.appendChild(messageNode);
+
+            for (Element body : bodies) {
+                Node bodyNode = doc.importNode(body, true);
+                rootElementXyz.appendChild(bodyNode);
+            }
+            TransformerFactory transformerFactory = TransformerFactory.newInstance();
+            Transformer transformer = transformerFactory.newTransformer();
+            transformer.setOutputProperty(OutputKeys.VERSION, "1.0");
+            transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+            transformer.setOutputProperty(OutputKeys.STANDALONE, "yes");
+            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+            transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
+
+            StringWriter writer = new StringWriter();
+            transformer.transform(new DOMSource(doc), new StreamResult(writer));
+            return writer.toString().replaceAll("(?m)^[ \t]*\r?\n", "");
+
+        } catch (Exception e) {
+            System.err.println("Error creating final XML: " + e.getMessage());
+            return null;
+        }
+    }
+}
+
+
+
+
+
+
