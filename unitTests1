@@ -1,4 +1,95 @@
 @Test
+    public void getRep_whenHasSixFragmentsForTwoCountries_returnsCorrectXmlStructure() {
+        // Arrange
+        QueriesResults queriesResults = new QueriesResults();
+        
+        // Set up RepData
+        List<QueriesResults.RepData> repDataList = new ArrayList<>();
+        QueriesResults.RepData repData = new QueriesResults.RepData();
+        repData.setMName("TEST");
+        repData.setRepR("CMC_123");
+        repData.setQuelle("TEST");
+        repData.setRepPer(new Date());
+        repData.setRepPerS(new Date());
+        repData.setRepPerE(new Date());
+        repDataList.add(repData);
+        queriesResults.setRepData(repDataList);
+        
+        // Set up 6 Fragments for 2 countries (DE and FR)
+        List<QueriesResults.XmlFragmentData> fragments = new ArrayList<>();
+        
+        // DE Fragments
+        fragments.add(createXmlFragment("DE", "<R_I><data>DE Test 1</data></R_I>"));
+        fragments.add(createXmlFragment("DE", "<Rep><data>DE Test 2</data></Rep>"));
+        fragments.add(createXmlFragment("DE", "<Additional_I><data>DE Test 3</data></Additional_I>"));
+        
+        // FR Fragments
+        fragments.add(createXmlFragment("FR", "<R_I><data>FR Test 1</data></R_I>"));
+        fragments.add(createXmlFragment("FR", "<Rep><data>FR Test 2</data></Rep>"));
+        fragments.add(createXmlFragment("FR", "<Additional_I><data>FR Test 3</data></Additional_I>"));
+        
+        queriesResults.setFragments(fragments);
+
+        when(queryDao.executeQueries(anyInt())).thenReturn(queriesResults);
+
+        // Act
+        MyService.Result result = myService.getRep(1);
+
+        // Assert
+        assertEquals(MyService.ResultCode.FILE_NAME_AND_CONTENT, result.getCode());
+        assertNotNull(result.getFileName());
+        assertNotNull(result.getXmlFileContent());
+        
+        String xmlContent = result.getXmlFileContent();
+        assertTrue(xmlContent.contains("CMC_KAKA"));
+        
+        // Verify Message section exists
+        assertTrue(xmlContent.contains("<MeSp>"));
+        assertTrue(xmlContent.contains("</MeSp>"));
+        
+        // Verify two Body sections exist
+        int bodyCount = countOccurrences(xmlContent, "<Body>");
+        assertEquals("Should have exactly 2 Body elements", 2, bodyCount);
+        
+        // Verify correct ordering within each Body
+        // Each body should maintain R_I -> Rep -> Additional_I order
+        assertTrue(xmlContent.contains("<R_I>"));
+        assertTrue(xmlContent.contains("<Rep>"));
+        assertTrue(xmlContent.contains("<Additional_I>"));
+        
+        // Verify all test data is present
+        assertTrue(xmlContent.contains("DE Test 1"));
+        assertTrue(xmlContent.contains("DE Test 2"));
+        assertTrue(xmlContent.contains("DE Test 3"));
+        assertTrue(xmlContent.contains("FR Test 1"));
+        assertTrue(xmlContent.contains("FR Test 2"));
+        assertTrue(xmlContent.contains("FR Test 3"));
+    }
+    
+    // Helper method to create XML fragment
+    private QueriesResults.XmlFragmentData createXmlFragment(String country, String xmlContent) {
+        QueriesResults.XmlFragmentData fragment = new QueriesResults.XmlFragmentData();
+        fragment.setCountry(country);
+        fragment.setXmlFragment(xmlContent);
+        return fragment;
+    }
+    
+    // Helper method to count occurrences of a substring in a string
+    private int countOccurrences(String str, String findStr) {
+        int count = 0;
+        int lastIndex = 0;
+        while (lastIndex != -1) {
+            lastIndex = str.indexOf(findStr, lastIndex);
+            if (lastIndex != -1) {
+                count++;
+                lastIndex += findStr.length();
+            }
+        }
+        return count;
+    }
+
+
+@Test
     public void isRepPerShort_whenPeriodExactlyOneYear_returnsFalse() {
         // Arrange
         Calendar calendar = Calendar.getInstance();
