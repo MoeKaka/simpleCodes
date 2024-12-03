@@ -1,4 +1,49 @@
 @Test
+    public void getRep_when950AndNoFragments_returnsOnlyFileName() {
+        // Arrange
+        QueriesResults queriesResults = new QueriesResults();
+        
+        // Set up RepData for 950 case
+        List<QueriesResults.RepData> repDataList = new ArrayList<>();
+        QueriesResults.RepData repData = new QueriesResults.RepData();
+        
+        // Setting required fields
+        repData.setMName("TEST");
+        repData.setRepR("CMC_950");  // Setting 950 case
+        repData.setQuelle("SOURCE");
+        repData.setIsBodyDeleted(1);  // Setting deleted flag
+        
+        // Set dates
+        Calendar calendar = Calendar.getInstance();
+        calendar.set(2024, Calendar.DECEMBER, 31);
+        Date endDate = calendar.getTime();
+        calendar.set(2024, Calendar.JANUARY, 1);
+        Date startDate = calendar.getTime();
+        
+        repData.setRepPer(endDate);
+        repData.setRepPerS(startDate);
+        repData.setRepPerE(endDate);
+        repData.setDesExTs(new Date());  // Setting DesExTs to ensure ONLY_FILE_NAME result
+        
+        repDataList.add(repData);
+        queriesResults.setRepData(repDataList);
+        
+        // Empty fragments list
+        queriesResults.setFragments(new ArrayList<>());
+        
+        when(queryDao.executeQueries(anyInt())).thenReturn(queriesResults);
+
+        // Act
+        MyService.Result result = myService.getRep(1);
+
+        // Assert
+        assertEquals(MyService.ResultCode.ONLY_FILE_NAME, result.getCode());
+        assertEquals("950_TEST_2024-12.geloescht", result.getFileName());
+        assertNull(result.getXmlFileContent());
+    }
+
+
+@Test
     public void testBuildFileName_allCombinations() throws Exception {
         // Test data structure: repR, isDeleted, startDate, endDate, expectedFileName
         Object[][] testCases = {
