@@ -1,4 +1,18 @@
-    @Override
+                .map(result -> {
+                    Object[] row = (Object[]) result;
+                    return new QueriesResults.RepData(
+                            row[0] != null ? row[0].toString() : null,  // QUELLE
+                            row[1] != null ? row[1].toString() : null,  // NAME
+                            row[2] != null ? row[2].toString() : null,  // RepR
+                            row[3] != null ? (Date)row[3] : null,       // RepPer_S
+                            row[4] != null ? (Date)row[4] : null,       // RepPer_E
+                            row[5] != null ? (Date)row[5] : null,       // RepPer
+                            row[6] != null ? (Date)row[6] : null        // DesExTs
+                    );
+                })
+                .collect(Collectors.toList());
+
+@Override
     public QueriesResults executeQueries(int reportId) {
         String sqlB = "SELECT new com.example.QueriesResults$RepData(b.QUELLE, m.NAME, b.RepR, r.RepPer_S, r.RepPer_E, r.RepPer, r.DesExTs) " +
                 "FROM rep r " +
