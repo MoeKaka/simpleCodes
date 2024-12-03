@@ -1,4 +1,41 @@
-   private static class RepDataBuilder {
+/**
+ * Liefert das Ergebnis eines Berichts basierend auf der übergebenen Bericht-ID.
+ *
+ * @param reportId die ID des Berichts, der abgerufen werden soll
+ * @return ein {@code Result}-Objekt mit dem entsprechenden Status und optionalen Dateiinformationen
+ *
+ * <p>Das Verhalten der Methode ist wie folgt:</p>
+ * <ul>
+ *   <li>Wenn die Bericht-ID nicht in der Datenbank gefunden wird, wird ein {@code Result} mit 
+ *   {@code Result.ResultCode.NO_REPORT_FOUND} zurückgegeben.</li>
+ *
+ *   <li>Wenn der Bericht gefunden, aber gelöscht wurde und noch nie an XYZ gesendet wurde, wird 
+ *   ein {@code Result} mit {@code Result.ResultCode.NOTHING_TO_SEND} zurückgegeben.</li>
+ *
+ *   <li>Wenn der Bericht gefunden, gelöscht und zuvor an XYZ gesendet wurde, wird ein 
+ *   {@code Result} mit {@code Result.ResultCode.ONLY_FILE_NAME} zurückgegeben. In diesem Fall wird 
+ *   der Dateiname in {@code Result.fileName} gesetzt und die Dateiendung ist ".deleted", da die Datei 
+ *   leer sein sollte.</li>
+ *
+ *   <li>Wenn der Bericht gefunden und nicht gelöscht wurde, wird ein {@code Result} mit 
+ *   {@code Result.ResultCode.FILE_NAME_AND_CONTENT} zurückgegeben. In diesem Fall werden 
+ *   {@code Result.fileName} und {@code Result.xmlFileName} entsprechend ausgefüllt.</li>
+ *
+ *   <li>Wenn während der Verarbeitung ein Fehler auftritt, wird ein {@code Result} mit 
+ *   {@code Result.ResultCode.PROCESSING_ERROR} zurückgegeben.</li>
+ * </ul>
+ *
+ * <p>Das Dateinamensschema lautet:
+ * <code>Source_mName_reportYear[-EndMonth].[Extension]</code>, wobei:
+ * <ul>
+ *   <li><b>Source:</b> "DDD", "EEE" oder "950", falls die Reporting-Rolle xyz_950 ist.</li>
+ *   <li><b>-EndMonth:</b> Nur enthalten, wenn das Berichtsjahr verkürzt ist.</li>
+ *   <li><b>Extension:</b> "xml", wenn die Datei Inhalt enthält, oder ".deleted", wenn die Datei leer ist.</li>
+ * </ul>
+ */
+
+
+private static class RepDataBuilder {
         private QueriesResults.RepData repData;
 
         private RepDataBuilder() {
