@@ -2,27 +2,30 @@
  * Liefert das Ergebnis eines Berichts basierend auf der übergebenen Bericht-ID.
  *
  * @param reportId die ID des Berichts, der abgerufen werden soll
- * @return ein {@code Result}-Objekt mit dem entsprechenden Status und optionalen Dateiinformationen
+ * @return ein {@link Result} Objekt mit dem entsprechenden Status und optionalen Dateiinformationen
  *
  * <p>Das Verhalten der Methode ist wie folgt:</p>
  * <ul>
- *   <li>Wenn die Bericht-ID nicht in der Datenbank gefunden wird, wird ein {@code Result} mit 
- *   {@code Result.ResultCode.NO_REPORT_FOUND} zurückgegeben.</li>
+ *   <li>Wenn die Bericht-ID nicht in der Datenbank gefunden wird, wird ein {@link Result} zurückgegeben, 
+ *   dessen {@link Result#getCode() code} den Wert {@link ResultCode#NO_REPORT_FOUND} hat.</li>
  *
  *   <li>Wenn der Bericht gefunden, aber gelöscht wurde und noch nie an XYZ gesendet wurde, wird 
- *   ein {@code Result} mit {@code Result.ResultCode.NOTHING_TO_SEND} zurückgegeben.</li>
+ *   ein {@link Result} zurückgegeben, dessen {@link Result#getCode() code} den Wert 
+ *   {@link ResultCode#NOTHING_TO_SEND} hat.</li>
  *
  *   <li>Wenn der Bericht gefunden, gelöscht und zuvor an XYZ gesendet wurde, wird ein 
- *   {@code Result} mit {@code Result.ResultCode.ONLY_FILE_NAME} zurückgegeben. In diesem Fall wird 
- *   der Dateiname in {@code Result.fileName} gesetzt und die Dateiendung ist ".deleted", da die Datei 
- *   leer sein sollte.</li>
+ *   {@link Result} zurückgegeben, dessen {@link Result#getCode() code} den Wert 
+ *   {@link ResultCode#ONLY_FILE_NAME} hat. In diesem Fall wird der Dateiname über 
+ *   {@link Result#getFileName() getFileName()} bereitgestellt und die Dateiendung ist ".deleted", 
+ *   da die Datei leer sein sollte.</li>
  *
- *   <li>Wenn der Bericht gefunden und nicht gelöscht wurde, wird ein {@code Result} mit 
- *   {@code Result.ResultCode.FILE_NAME_AND_CONTENT} zurückgegeben. In diesem Fall werden 
- *   {@code Result.fileName} und {@code Result.xmlFileName} entsprechend ausgefüllt.</li>
+ *   <li>Wenn der Bericht gefunden und nicht gelöscht wurde, wird ein {@link Result} zurückgegeben, 
+ *   dessen {@link Result#getCode() code} den Wert {@link ResultCode#FILE_NAME_AND_CONTENT} hat. In diesem Fall werden 
+ *   der Dateiname über {@link Result#getFileName() getFileName()} und der XML-Dateiname über 
+ *   {@link Result#getXmlFileContent() getXmlFileContent()} bereitgestellt.</li>
  *
- *   <li>Wenn während der Verarbeitung ein Fehler auftritt, wird ein {@code Result} mit 
- *   {@code Result.ResultCode.PROCESSING_ERROR} zurückgegeben.</li>
+ *   <li>Wenn während der Verarbeitung ein Fehler auftritt, wird ein {@link Result} zurückgegeben, 
+ *   dessen {@link Result#getCode() code} den Wert {@link ResultCode#PROCESSING_ERROR} hat.</li>
  * </ul>
  *
  * <p>Das Dateinamensschema lautet:
