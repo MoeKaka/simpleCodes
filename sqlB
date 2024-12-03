@@ -1,4 +1,55 @@
-                .map(result -> {
+   private static class RepDataBuilder {
+        private QueriesResults.RepData repData;
+
+        private RepDataBuilder() {
+            this.repData = new QueriesResults.RepData();
+        }
+
+        public static RepDataBuilder aRepData() {
+            return new RepDataBuilder();
+        }
+
+        public RepDataBuilder withMName(String mName) {
+            repData.setMName(mName);
+            return this;
+        }
+
+        public RepDataBuilder withRepR(String repR) {
+            repData.setRepR(repR);
+            return this;
+        }
+
+        public RepDataBuilder withQuelle(String quelle) {
+            repData.setQuelle(quelle);
+            return this;
+        }
+
+        public RepDataBuilder withRepPer(Date repPer) {
+            repData.setRepPer(repPer);
+            return this;
+        }
+
+        public RepDataBuilder withRepPerS(Date repPerS) {
+            repData.setRepPerS(repPerS);
+            return this;
+        }
+
+        public RepDataBuilder withRepPerE(Date repPerE) {
+            repData.setRepPerE(repPerE);
+            return this;
+        }
+
+        public RepDataBuilder withDesExTs(Date desExTs) {
+            repData.setDesExTs(desExTs);
+            return this;
+        }
+
+        public QueriesResults.RepData build() {
+            return repData;
+        }
+    }
+
+.map(result -> {
                     Object[] row = (Object[]) result;
                     return new QueriesResults.RepData(
                             row[0] != null ? row[0].toString() : null,  // QUELLE
